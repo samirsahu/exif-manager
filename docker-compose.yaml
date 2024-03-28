@@ -1,0 +1,21 @@
+version: "3.8"
+services:
+
+  app:
+    # build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        some-arg: 1
+    volumes: 
+      - .:/app
+    command: sleep infinity
+    # ports:
+    #   - '80:80'
+    # env_file: 
+    #   - ./env/backend.env
+
+# volumes: 
+#   data:
+#   logs:
