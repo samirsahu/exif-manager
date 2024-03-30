@@ -1,21 +1,21 @@
 version: "3.8"
 services:
-
-  app:
+  dev: &dev
     # build: .
     build:
       context: .
       dockerfile: Dockerfile
       args:
-        some-arg: 1
-    volumes: 
+        arg1: 1
+    init: true
+    # user: nobody
+    volumes:
       - .:/app
+      # - /Users/sam/Movies/Handbrake:/app/mount
     command: sleep infinity
-    # ports:
-    #   - '80:80'
-    # env_file: 
-    #   - ./env/backend.env
 
-# volumes: 
-#   data:
-#   logs:
+  app:
+    <<: *dev
+    profiles:
+      - not_started_automatically
+    command: python3.12 src/main.py
