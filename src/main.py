@@ -40,7 +40,8 @@ def main(args: list[str]) -> None:
     elif "encode-videos" == mode:
         video_utils.encode_videos(base_dir)
     elif "temp" == mode:
-        video_utils.encode_videos(base_dir, max_files=1)
+        # video_utils.encode_videos(base_dir, max_files=1)
+        logger.info(video_utils.encode_video(f"{base_dir}/2015/iPhone 5S", "IMG_0398.MOV"))
         pass
     else:
         raise ValueError("Invalid command")

@@ -59,55 +59,35 @@ def encode_videos(base_dir: str, *, max_files: int = sys.maxsize) -> None:
     skipped_num: int = 0
 
     for dir_path, dir_names, file_names in os.walk(base_dir): # pylint: disable=unused-variable
+
+        dir_name = os.path.basename(dir_path)
+        if dir_name.startswith("@") or dir_name.startswith("."):
+            logger.info("Skip directory: %s", dir_path)
+            continue
+
         file_names_set = set(file_names)
-        for file_name_full in file_names:
-            inp_file_name, inp_file_ext = os.path.splitext(file_name_full)
+        for inp_file_name in file_names:
+            inp_file_name_only, inp_file_ext = os.path.splitext(inp_file_name)
 
             if inp_file_ext.lower() == ".mov":
                 logger.info("======================================================")
                 try:
                     video_file_num += 1
 
-                    inp_file_path = os.path.join(dir_path, file_name_full)
-                    logger.info("%d. Encoding File: %s", video_file_num, inp_file_path)
+                    inp_file_path = os.path.join(dir_path, inp_file_name)
+                    logger.info("%d. Checking File: %s", video_file_num, inp_file_path)
 
-                    if f"{inp_file_name}.mp4" in file_names_set:
+                    if f"{inp_file_name_only}.mp4" in file_names_set:
                         logger.info("MP4 already exists. Skip")
                         skipped_num += 1
                         continue
 
-                    if f"{file_name_full}_error" in file_names_set:
+                    if f"{inp_file_name}_err" in file_names_set:
                         logger.info("Error file exists. Skip")
                         skipped_num += 1
                         continue
-
-                    out_file_path = os.path.join(
-                        dir_path, f"{inp_file_name}.mp4")
-
-                    logger.info("Encode %s to %s",
-                                inp_file_path, out_file_path)
-                    encode_rc: int = process_command([
-                        HANDBRAKE_CLI,
-                        "-i",
-                        inp_file_path,
-                        "-o",
-                        out_file_path,
-                    ])
-                    if encode_rc != 0:
-                        raise RuntimeError(f"Error trying to encode file. RC: {encode_rc}")
-
-                    logger.info("Update EXIF")
-                    update_video_exif(out_file_path, inp_file_path)
-
-                    logger.info("Delete _original file created by EXIF Tool")
-                    os.remove(os.path.join(dir_path, f"{out_file_path}_original"))
-                    logger.info("File encoded to %s", out_file_path)
-
-                    logger.info("Update timestamps as source file")
-                    touch_rc = process_command(
-                        ["touch", "-r", inp_file_path, out_file_path])
-                    if touch_rc != 0:
-                        raise RuntimeError(f"Error trying to touch file. RC: {touch_rc}")
+                    
+                    out_file_path = encode_video(dir_path, inp_file_name)
 
                     encoded_num += 1
 
@@ -118,8 +98,9 @@ def encode_videos(base_dir: str, *, max_files: int = sys.maxsize) -> None:
                 except Exception as exc:  # pylint: disable=broad-exception-caught
                     failed_num += 1
                     logger.exception(exc)
-                    os.remove(out_file_path)
-                    with closing(open(f"{inp_file_path}_error", "w", encoding="UTF-8")) as err_file:
+                    if out_file_path:
+                        os.remove(out_file_path)
+                    with closing(open(f"{inp_file_path}_err", "a", encoding="UTF-8")) as err_file:
                         err_file.write(str(exc))
 
             if encoded_num >= max_files:
@@ -129,6 +110,44 @@ def encode_videos(base_dir: str, *, max_files: int = sys.maxsize) -> None:
             break
 
     logger.info("Encode status: Success=%d, Failed=%d, Skipped=%d",encoded_num, failed_num, skipped_num)
+
+def encode_video(dir_path: str, inp_file_name: str) -> str:
+
+    inp_file_path = os.path.join(dir_path, inp_file_name)
+    inp_file_name_only, inp_file_ext = os.path.splitext(inp_file_name)
+
+    with closing(open(f"{inp_file_path}_wip", "a", encoding="UTF-8")) as wip_file:
+        wip_file.write("Working")
+
+    out_file_path = os.path.join(dir_path, f"{inp_file_name_only}.mp4")
+
+    logger.info("Encode %s to %s", inp_file_path, out_file_path)
+    encode_rc: int = process_command([
+        HANDBRAKE_CLI,
+        "-i",
+        inp_file_path,
+        "-o",
+        out_file_path,
+    ])
+    if encode_rc != 0:
+        raise RuntimeError(f"Error trying to encode file. RC: {encode_rc}")
+
+    logger.info("Update EXIF")
+    update_video_exif(out_file_path, inp_file_path)
+
+    logger.info("Delete _original file created by EXIF Tool")
+    os.remove(os.path.join(dir_path, f"{out_file_path}_original"))
+    logger.info("File encoded to %s", out_file_path)
+
+    logger.info("Update timestamps as source file")
+    touch_rc = process_command(["touch", "-r", inp_file_path, out_file_path])
+    if touch_rc != 0:
+        raise RuntimeError(f"Error trying to touch file. RC: {touch_rc}")
+
+    logger.info("Remove WIP file")
+    os.remove(f"{inp_file_path}_wip")
+
+    return out_file_path
 
 
 def process_command(command: list[str]) -> int:
