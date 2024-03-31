@@ -11,7 +11,8 @@ services:
     # user: nobody
     volumes:
       - .:/app
-      # - /Users/sam/Movies/Handbrake:/app/mount
+      - /Users/sam/Work/CodeProjects/exif-manager/data:/app/mount:rw
+      # - /Volumes/Sam/Pictures/Camera Roll/iPhone Photos:/app/mount:rw
     command: sleep infinity
 
   app:

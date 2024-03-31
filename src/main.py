@@ -1,39 +1,67 @@
-import os
+import argparse
+from datetime import datetime, timezone, tzinfo
 import logging
 from logging.handlers import RotatingFileHandler
-from image_exif import read_image
-from video_videopy import read_video_moviepy
-from video_exiftool import read_video_exiftool, update_video_props
-from video_fixer import fix_video_exif
+import sys
+import image_utils
+import video_utils
 
 logging.basicConfig(
     handlers=[RotatingFileHandler(
-        filename="service.log",
-        backupCount=5,
+        filename="service-{:%Y-%m-%dT%H-%M-%S}.log".format(datetime.now()),
+        backupCount=10,
         maxBytes=10*1024*1024 # 10MB
     )],
-    encoding='utf-8', level=logging.INFO, 
-    format='%(asctime)s: %(levelname)s: %(name)s: %(message)s',
+    encoding='utf-8', level=logging.INFO,
+    format='%(asctime)s: %(levelname)s: %(name)s: L%(lineno)d: %(message)s',
 )
 
-base_dir: str = "/app" # Run in Docker container
-# base_dir: str = "/Users/sam/Work/CodeProjects/exif-reader" # Run in macos directy
+logger = logging.getLogger(__name__)
 
+# base_dir: str = "/app/data" # Run in Docker container
+base_dir: str = "/app/mount" # Run in Docker container
 
-def main() -> None:
-    # read_image(f"{base_dir}/data/2023-06-23 19.25.30.jpg")
-    # read_video_moviepy(f"{base_dir}/data/2023-07-05 10.25.15.MOV")
-    # read_video(f"{base_dir}/data/2023-07-05 10.25.15-fhd.mp4")
-    # read_video(f"{base_dir}/data/2023-07-05 10.25.15-4k-hevc.mp4")
+# base_dir: str = "/Users/sam/Work/CodeProjects/exif-manager/data" # Run in macos directy
+# base_dir: str = "/Volumes/Sam/Pictures/Camera Roll/iPhone Photos"
 
-    # read_video_exiftool(f"{base_dir}/data/2023-07-05 10.25.15.MOV")
-    # read_video_exiftool(f"{base_dir}/data/2023-07-05 10.25.15.mp4")
-    # update_video_props(f"{base_dir}/data/2023-07-05 10.25.15.mp4", f"{base_dir}/data/2023-07-05 10.25.15.MOV")
-    # print("AFTER UPDATE====")
-    # read_video_exiftool(f"{base_dir}/data/2023-07-05 10.25.15.mp4")
+def main(args: list[str]) -> None:
+    parser = setup_args_parser()
+    parsed_args = parser.parse_args(args)
 
-    fix_video_exif(os.path.join(base_dir, "data"))
+    mode = parsed_args.mode
+    logger.info("Mode: %s", mode)
 
+    if "read-image-exif" == mode:
+        for f in parsed_args.files:
+            image_utils.read_image_exif(f"{base_dir}/data/2023-06-23 19.25.30.jpg")
+    elif "read-video-exif" == mode:
+        video_utils.read_video_exif_moviepy(f"{base_dir}/data/2023-07-05 10.25.15.MOV")
+        video_utils.read_video_exif_exiftool(f"{base_dir}/data/2023-07-05 10.25.15.MOV")
+    elif "encode-videos" == mode:
+        video_utils.encode_videos(base_dir)
+    elif "temp" == mode:
+        video_utils.encode_videos(base_dir, max_files=1)
+        pass
+    else:
+        raise ValueError("Invalid command")
+
+def setup_args_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="exif-manager",
+        description="Bunch of utilities that can be performed on Audio/Video files."
+    )
+    mode_parser = parser.add_subparsers(dest="mode", required=True)
+
+    sub_parser = mode_parser.add_parser("read-image-exif", help="Read EXIF data for the list of Pictures." )
+    sub_parser.add_argument("files", type=str, nargs="+")
+
+    sub_parser = mode_parser.add_parser("read-video-exif", help="Read EXIF data for the list of Videos." )
+    sub_parser.add_argument("files", type=str, nargs="+")
+
+    sub_parser = mode_parser.add_parser("encode-videos", help="Encodes all the .MOV videos to .MP4 in the mounted directory recursively" )
+
+    sub_parser = mode_parser.add_parser("temp", help="Some temporary command")
+    return parser
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1:])
