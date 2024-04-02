@@ -5,6 +5,7 @@ Project to read EXIF metadata in Media files.
 ## To do:
 - Build using shrinkwrap.
 - Accept Mount directory via Docker arguments.
+- Auto Run in QNAP NAS and watch folder.
 
 
 
